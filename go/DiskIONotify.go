@@ -8,6 +8,7 @@ import ("fmt"
 	"io"
 	"bytes"
 	"strings"
+	"code.google.com/p/go-sqlite/go1/sqlite3"
 )
 
 func doCleanJob( fifoPath string ){
@@ -41,9 +42,23 @@ func doBeginIoNotify( fifoPath string, confPath string, waitSec int ){
 func processEvent( line string ){
 	d := strings.Split( line, "$$$$$$" )
 
-	fmt.Fprintf( os.Stderr, "Idx0=%q, Idx1=%q, Idx2=%q, Idx3=%q\n", d[0], d[1], d[2], d[3] );
-	return
+	//fmt.Fprintf( os.Stderr, "Idx0=%q, Idx1=%q, Idx2=%q, Idx3=%q\n", d[0], d[1], d[2], d[3] );
+	//return
+
+	/*
+Idx0="14/03/08-10:04", Idx1="ATTRIB,ISDIR", Idx2="/datas/shares/", Idx3=""
+Idx0="14/03/08-10:04", Idx1="ATTRIB,ISDIR", Idx2="/datas/shares/", Idx3=""
+Idx0="14/03/08-10:04", Idx1="CLOSE_WRITE,CLOSE", Idx2="/datas/shares/.AppleDouble/", Idx3=".Parent"
+Idx0="14/03/08-10:04", Idx1="MODIFY", Idx2="/datas/shares/Network Trash Folder/.AppleDouble/", Idx3=".Parent"
+Idx0="14/03/08-10:04", Idx1="CLOSE_WRITE,CLOSE", Idx2="/datas/shares/Network Trash Folder/.AppleDouble/", Idx3=".Parent"
+Idx0="14/03/08-10:04", Idx1="MODIFY", Idx2="/datas/shares/Temporary Items/.AppleDouble/", Idx3=".Parent"
+Idx0="14/03/08-10:04", Idx1="CLOSE_WRITE,CLOSE", Idx2="/datas/shares/Temporary Items/.AppleDouble/", Idx3=".Parent"
+Idx0="14/03/08-10:04", Idx1="MODIFY", Idx2="/datas/shares/.AppleDesktop/", Idx3=".volinfo"
+Idx0="14/03/08-10:04", Idx1="MODIFY", Idx2="/datas/shares/.AppleDesktop/", Idx3=".volinfo"
+Idx0="14/03/08-10:04", Idx1="CLOSE_WRITE,CLOSE", Idx2="/datas/shares/.AppleDesktop/", Idx3=".volinfo"
+	*/
 	//fmt.Println( d );
+	/*
 	for  k, v := range d {
 		if strings.Contains( v, ".AppleDouble" ){
 			return
@@ -55,6 +70,34 @@ func processEvent( line string ){
 			case 2:
 		}
 		fmt.Println( "k=", k, "  v=", v )
+	}
+	*/
+	eventToDB( d )
+}
+
+var dbHandle  *sqlite3.Conn
+var dbError   error
+func openDB( path string ) (bool){
+	dbHandle, dbError = sqlite3.Open( path )
+	if dbError != nil {
+		fmt.Fprintf( os.Stderr, "open database failed: %q\n", path )
+		dbHandle = nil
+		return false
+	}
+	fmt.Fprintf( os.Stderr, "open database : %q\n", path )
+	return true
+}
+
+func eventToDB(  event [] string ){
+
+	unixTime := time.Now().Unix()
+
+	sql := fmt.Sprintf( "SELECT isDir, dir, file, lastUp, type, doing FROM t_io_notify_tasks WHERE (%v - lastUp) > 5", unixTime);
+	fmt.Fprintf( os.Stderr, sql, "\n" )
+
+	
+	if event[1] == "HELLO"{
+
 	}
 }
 
@@ -103,6 +146,9 @@ func main(){
 	doCleanJob( fifoPath )
 
 	confPath := curPath + "/etc/HomeNAS/ionotify.conf"
+	dbPath   := curPath + "/../db/BasicData.sqlite"
+
+	openDB( dbPath )
 
 	go doReadFifo( fifoPath )
 	go doBeginIoNotify( fifoPath, confPath, 3 )	
